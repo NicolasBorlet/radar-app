@@ -110,30 +110,38 @@ export default function TabTwoScreen() {
   const fetchRadarData = useCallback(async (bounds: MapBounds) => {
     try {
       setIsLoading(true);
-      const url = new URL('https://tabular-api.data.gouv.fr/api/resources/8a22b5a8-4b65-41be-891a-7c0aead4ba51/data/');
-      
-      url.searchParams.append('page_size', '50');
-      
-      url.searchParams.append('latitude__greater', bounds.southWest.latitude.toString());
-      url.searchParams.append('latitude__less', bounds.northEast.latitude.toString());
-      url.searchParams.append('longitude__greater', bounds.southWest.longitude.toString());
-      url.searchParams.append('longitude__less', bounds.northEast.longitude.toString());
-      
-      url.searchParams.append('date_installation__sort', 'desc');
-      
-      const response = await fetch(url.toString());
-      const jsonData: APIResponse = await response.json();
-      console.log('Fetched data for region:', bounds);
-      console.log('URL:', url.toString());
-      setRadarData(jsonData.data);
-      createClusters(jsonData.data, mapRegion);
+      let allData: RadarData[] = [];
+      let page = 1;
+      const pageSize = 50;
+      let totalItems = 0;
+  
+      do {
+        const url = new URL('https://tabular-api.data.gouv.fr/api/resources/8a22b5a8-4b65-41be-891a-7c0aead4ba51/data/');
+        url.searchParams.append('page_size', pageSize.toString());
+        url.searchParams.append('page', page.toString());
+        url.searchParams.append('latitude__greater', bounds.southWest.latitude.toString());
+        url.searchParams.append('latitude__less', bounds.northEast.latitude.toString());
+        url.searchParams.append('longitude__greater', bounds.southWest.longitude.toString());
+        url.searchParams.append('longitude__less', bounds.northEast.longitude.toString());
+        url.searchParams.append('date_installation__sort', 'desc');
+  
+        const response = await fetch(url.toString());
+        const jsonData: APIResponse = await response.json();
+        totalItems = jsonData.meta.total;
+        allData = allData.concat(jsonData.data);
+        page++;
+      } while (allData.length < totalItems);
+  
+      console.log('Fetched all data for region:', bounds);
+      setRadarData(allData);
+      createClusters(allData, mapRegion);
     } catch (error) {
       console.error('Error fetching radar data:', error);
     } finally {
       setIsLoading(false);
     }
   }, [mapRegion, createClusters]);
-
+  
   const onRegionChangeComplete = useCallback((region: Region) => {
     setMapRegion(region);
     const bounds = getMapBounds(region);
