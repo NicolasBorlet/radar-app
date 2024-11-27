@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import MapView, { Region, Marker, Callout } from 'react-native-maps';
 import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 interface RadarData {
   latitude: number;
@@ -110,6 +112,21 @@ export default function TabTwoScreen() {
   const fetchRadarData = useCallback(async (bounds: MapBounds) => {
     try {
       setIsLoading(true);
+  
+      // Check for cached data
+      const cachedData = await AsyncStorage.getItem('radarData');
+      if (cachedData) {
+        console.log('Using cached data');
+        const allData: RadarData[] = JSON.parse(cachedData);
+        setRadarData(allData);
+        createClusters(allData, mapRegion);
+        setIsLoading(false);
+        return;
+      } else {
+        console.log('No cached data found');
+      }
+  
+      // Fetch data from API
       let allData: RadarData[] = [];
       let page = 1;
       const pageSize = 50;
@@ -133,6 +150,7 @@ export default function TabTwoScreen() {
       } while (allData.length < totalItems);
   
       console.log('Fetched all data for region:', bounds);
+      await AsyncStorage.setItem('radarData', JSON.stringify(allData));
       setRadarData(allData);
       createClusters(allData, mapRegion);
     } catch (error) {
@@ -141,7 +159,7 @@ export default function TabTwoScreen() {
       setIsLoading(false);
     }
   }, [mapRegion, createClusters]);
-  
+
   const onRegionChangeComplete = useCallback((region: Region) => {
     setMapRegion(region);
     const bounds = getMapBounds(region);
@@ -167,6 +185,8 @@ export default function TabTwoScreen() {
         style={styles.map}
         region={mapRegion}
         onRegionChangeComplete={onRegionChangeComplete}
+        // Desactive rotation
+        rotateEnabled={false}
       >
         {clusters.map((cluster) => (
           <Marker
