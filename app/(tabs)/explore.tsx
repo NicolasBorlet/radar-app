@@ -118,8 +118,17 @@ export default function TabTwoScreen() {
       if (cachedData) {
         console.log('Using cached data');
         const allData: RadarData[] = JSON.parse(cachedData);
-        setRadarData(allData);
-        createClusters(allData, mapRegion);
+
+        // Filter data for current region
+        const filteredData = allData.filter((radar) => (
+          radar.latitude > bounds.southWest.latitude &&
+          radar.latitude < bounds.northEast.latitude &&
+          radar.longitude > bounds.southWest.longitude &&
+          radar.longitude < bounds.northEast.longitude
+        ));
+
+        setRadarData(filteredData);
+        createClusters(filteredData, mapRegion);
         setIsLoading(false);
         return;
       } else {
