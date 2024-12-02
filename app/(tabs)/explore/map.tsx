@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import MapView, { Region } from 'react-native-maps';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import * as Crypto from 'expo-crypto';
 import * as Location from 'expo-location';
 import ZoneSvg from '@/components/zone';
 
@@ -10,9 +10,9 @@ interface RadarData {
   latitude: number;
   longitude: number;
   departement: string;
-  type: string;
   emplacement: string;
   direction: string;
+  type: string;
   vitesse_vehicules_legers_kmh: number | null;
   equipement: string;
   date_installation: string;
@@ -25,6 +25,13 @@ interface APIResponse {
     page: number;
     page_size: number;
   };
+}
+
+const initialRegion = {
+  latitude: 48.8566,
+  longitude: 2.3522,
+  latitudeDelta: 0.0922,
+  longitudeDelta: 0.0421,
 }
 
 interface MapBounds {
@@ -43,50 +50,48 @@ export default function TabTwoScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const debounceTimer = useRef<NodeJS.Timeout>();
+  const [currentDelta, setCurrentDelta] = useState<number>(0.0922);
+  const [mapRegion, setMapRegion] = useState<Region>(initialRegion);
+  const mapRef = useRef<MapView>(null);
+
+  const radarsComponents = useMemo(() => {
+    return radarData.map((radar, i) => (
+      <ZoneSvg
+        key={i}
+        latitude={radar.latitude}
+        longitude={radar.longitude}
+        delta={currentDelta}
+      />
+    ));
+  }, [radarData, currentDelta]);
 
   useEffect(() => {
-    async function getCurrentLocation() {
-      
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setErrorMsg('Permission to access location was denied');
-        return;
+    // need to refresh cause markers don't show on current delta change
+    mapRef.current?.animateCamera({
+      center: {
+        latitude: mapRegion.latitude,
+        longitude: mapRegion.longitude,
       }
+    });
+  }, [currentDelta]);
 
-      let location = await Location.getCurrentPositionAsync({});
-      setLocation(location);
-    }
+  const handleRegionChange = useCallback((region: Region) => {
+    // if (debounceTimer.current) {
+    //   clearTimeout(debounceTimer.current);
+    // }
+    
+    // debounceTimer.current = setTimeout(() => {
+    //   setCurrentDelta(region.latitudeDelta);
+    // }, 1000)
 
-    getCurrentLocation();
+    console.log('Region changed:', region);
+    
+    setMapRegion(region);
+    setCurrentDelta(Math.min(region.latitudeDelta, region.longitudeDelta));
   }, []);
 
-  const [mapRegion, setMapRegion] = useState<Region>({
-    latitude: location ? location.coords.latitude : 48.8566,
-    longitude: location ? location.coords.longitude : 2.3522,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
-  });
-
-  let text = 'Waiting...';
-  if (errorMsg) {
-    text = errorMsg;
-  } else if (location) {
-    text = JSON.stringify(location);
-  }
-  
-  const getMapBounds = (region: Region): MapBounds => {
-    const northEast = {
-      latitude: region.latitude + region.latitudeDelta / 2,
-      longitude: region.longitude + region.longitudeDelta / 2,
-    };
-    const southWest = {
-      latitude: region.latitude - region.latitudeDelta / 2,
-      longitude: region.longitude - region.longitudeDelta / 2,
-    };
-    return { northEast, southWest };
-  };
-
-  const fetchRadarData = useCallback(async (bounds: MapBounds) => {
+  const fetchRadarData = useCallback(async () => {
     try {
       setIsLoading(true);
   
@@ -95,20 +100,9 @@ export default function TabTwoScreen() {
       if (cachedData) {
         console.log('Using cached data');
         const allData: RadarData[] = JSON.parse(cachedData);
-
-        // Filter data for current region
-        // const filteredData = allData.filter((radar) => (
-        //   radar.latitude > bounds.southWest.latitude &&
-        //   radar.latitude < bounds.northEast.latitude &&
-        //   radar.longitude > bounds.southWest.longitude &&
-        //   radar.longitude < bounds.northEast.longitude
-        // ));
-
         setRadarData(allData);
         setIsLoading(false);
         return;
-      } else {
-        console.log('No cached data found');
       }
   
       // Fetch data from API
@@ -121,11 +115,6 @@ export default function TabTwoScreen() {
         const url = new URL('https://tabular-api.data.gouv.fr/api/resources/8a22b5a8-4b65-41be-891a-7c0aead4ba51/data/');
         url.searchParams.append('page_size', pageSize.toString());
         url.searchParams.append('page', page.toString());
-        // url.searchParams.append('latitude__greater', bounds.southWest.latitude.toString());
-        // url.searchParams.append('latitude__less', bounds.northEast.latitude.toString());
-        // url.searchParams.append('longitude__greater', bounds.southWest.longitude.toString());
-        // url.searchParams.append('longitude__less', bounds.northEast.longitude.toString());
-        // url.searchParams.append('date_installation__sort', 'desc');
   
         const response = await fetch(url.toString());
         const jsonData: APIResponse = await response.json();
@@ -134,7 +123,7 @@ export default function TabTwoScreen() {
         page++;
       } while (allData.length < totalItems);
   
-      console.log('Fetched all data for region:', bounds);
+      console.log('Fetched all data');
       await AsyncStorage.setItem('radarData', JSON.stringify(allData));
       setRadarData(allData);
     } catch (error) {
@@ -144,15 +133,26 @@ export default function TabTwoScreen() {
     }
   }, []);
 
+  // Initial data fetch and location setup
   useEffect(() => {
-    const initialBounds = getMapBounds(mapRegion);
-    fetchRadarData(initialBounds);
+    // const setup = async () => {
+    //   let { status } = await Location.requestForegroundPermissionsAsync();
+    //   if (status !== 'granted') {
+    //     setErrorMsg('Permission to access location was denied');
+    //     return;
+    //   }
 
-    setMapRegion({
-      ...mapRegion,
-      latitude: location ? location.coords.latitude : 48.8566,
-      longitude: location ? location.coords.longitude : 2.3522,
-    });
+    //   let userLocation = await Location.getCurrentPositionAsync({});
+    //   setLocation(userLocation);
+    //   setMapRegion(prev => ({
+    //     ...prev,
+    //     latitude: userLocation.coords.latitude,
+    //     longitude: userLocation.coords.longitude,
+    //   }));
+    // };
+
+    // setup();
+    fetchRadarData();
   }, []);
 
   if (isLoading) {
@@ -166,19 +166,15 @@ export default function TabTwoScreen() {
   return (
     <MapView
       style={styles.map}
+      ref={mapRef}
       region={mapRegion}
-      initialRegion={mapRegion}
+      initialRegion={initialRegion}
+      onRegionChangeComplete={handleRegionChange}
       rotateEnabled={false}
       showsUserLocation
       showsMyLocationButton
     >
-      {radarData.map((radar) => (
-        <ZoneSvg
-          key={`${radar.latitude}-${radar.longitude}`}
-          latitude={radar.latitude}
-          longitude={radar.longitude}
-        />
-      ))}
+      {radarsComponents}
     </MapView>
   );
 }
