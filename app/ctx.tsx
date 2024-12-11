@@ -72,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!response.ok) throw new Error(data.error.message);
 
       await AsyncStorage.setItem('token', data.jwt);
+      await AsyncStorage.setItem('userId', data.user.id);
       setToken(data.jwt);
       setUser(data.user);
       router.replace('/(auth)/(tabs)');
@@ -82,13 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (username: string, email: string, password: string) => {
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/auth/register`, {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/auth/local/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: username,
           username,
           email,
           password,

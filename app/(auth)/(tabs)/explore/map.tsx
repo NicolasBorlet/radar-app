@@ -1,4 +1,5 @@
 import ZoneSvg from '@/components/zone';
+import { createRank } from '@/lib/api/rank';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { getDistance } from 'geolib';
@@ -7,6 +8,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import MapView, { Region } from 'react-native-maps';
 
 interface RadarData {
+  id: string;
   latitude: number;
   longitude: number;
   departement: string;
@@ -98,6 +100,26 @@ export default function TabTwoScreen() {
     try {
       setIsLoading(true);
 
+      // Créer une zone de test près de la position actuelle
+      if (location) {
+        const testZone: RadarData = {
+          id: 'test-zone',
+          latitude: location.coords.latitude + 0.0001, // ~100m au nord
+          longitude: location.coords.longitude,
+          departement: 'TEST',
+          emplacement: 'Test Zone',
+          direction: 'N',
+          type: 'TEST',
+          vitesse_vehicules_legers_kmh: 50,
+          equipement: 'TEST',
+          date_installation: new Date().toISOString()
+        };
+
+        setRadarData([testZone]);
+        setIsLoading(false);
+        return;
+      }
+
       // Check for cached data
       const cachedData = await AsyncStorage.getItem('radarData');
       if (cachedData) {
@@ -143,11 +165,19 @@ export default function TabTwoScreen() {
   }, []);
 
   // Detect when user leaves a zone
-  const handleZoneLeave = useCallback(() => {
-    // Stop timer
-    const timeInZone = Date.now() - time;
-    console.log('Time in zone:', timeInZone);
-  }, []);
+  const handleZoneLeave = useCallback(async () => {
+    if (!activeZone) return;
+
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      const timeInZone = Date.now() - time;
+
+      await createRank(timeInZone, userId, activeZone.id);
+      console.log('Rank created successfully');
+    } catch (error) {
+      console.error('Failed to create rank:', error);
+    }
+  }, [activeZone, time]);
 
   useEffect(() => {
     if (isInZone && activeZone) {
@@ -185,9 +215,9 @@ export default function TabTwoScreen() {
 
       const subscription = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.High,
+          accuracy: 1,
           timeInterval: 1000,
-          distanceInterval: 10,
+          distanceInterval: 1,
         },
         (newLocation) => {
           setLocation(newLocation);
