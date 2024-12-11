@@ -37,9 +37,9 @@ Une application mobile qui permet aux utilisateurs de passer le plus rapidement 
 - AsyncStorage pour le stockage local
 
 ### Backend
-- API REST avec authentification
-- PostgreSQL avec Row Level Security (RLS)
-- Système de permissions granulaire
+- API REST avec Strapi
+- Base de données SQLite (par défaut) ou MySQL/PostgreSQL
+- Système de permissions via Strapi
 
 ## 📱 Structure du Projet
 ```
@@ -53,14 +53,14 @@ app/
 ```
 
 ## 🔒 Sécurité
-- Protection des routes avec RLS
+- Système de permissions Strapi
 - Tokens JWT pour l'authentification
 - Validation des données côté serveur
-- Gestion sécurisée des permissions
+- Middleware d'authentification Strapi
 
 ## 🌐 API Endpoints
-- `/api/auth/local` : Login
-- `/api/auth/register` : Inscription
+- `/api/auth/local` : Login (Strapi)
+- `/api/auth/local/register` : Inscription (Strapi)
 - `/api/ranks` : CRUD des scores
 - `/api/users/me` : Infos utilisateur
 
