@@ -75,9 +75,3 @@ app/
 ```
 EXPO_PUBLIC_BACKEND_URL=http://your-backend-url:1337
 ```
-
-## 🤝 Contribution
-Les contributions sont les bienvenues ! Voir le fichier CONTRIBUTING.md pour plus de détails.
-
-## 📄 Licence
-MIT
