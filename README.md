@@ -1,7 +1,7 @@
 # Radar Zone - Application Mobile
 
 ## 🎯 Objectif
-Une application mobile qui permet aux utilisateurs de découvrir et d'interagir avec des zones radar en temps réel. Les utilisateurs peuvent gagner des points en restant dans ces zones, créant ainsi une expérience gamifiée de la sécurité routière.
+Une application mobile qui permet aux utilisateurs de passer le plus rapidement possible dans les zones radar.
 
 ## 🚀 Fonctionnalités Principales
 
