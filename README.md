@@ -1,50 +1,83 @@
-# Welcome to your Expo app 👋
+# Radar Zone - Application Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## 🎯 Objectif
+Une application mobile qui permet aux utilisateurs de découvrir et d'interagir avec des zones radar en temps réel. Les utilisateurs peuvent gagner des points en restant dans ces zones, créant ainsi une expérience gamifiée de la sécurité routière.
 
-## Get started
+## 🚀 Fonctionnalités Principales
 
-1. Install dependencies
+### Authentification
+- Système complet de login/signup
+- Gestion des tokens JWT
+- Protection des routes authentifiées
 
-   ```bash
-   npm install
-   ```
+### Carte Interactive
+- Affichage en temps réel de la position de l'utilisateur
+- Visualisation des zones radar avec des cercles dynamiques
+- Adaptation de la taille des zones selon le niveau de zoom
+- Mode test avec zone radar proche de l'utilisateur
 
-2. Start the app
+### Système de Points
+- Détection automatique d'entrée/sortie de zone
+- Calcul du temps passé dans chaque zone
+- Enregistrement des scores dans une base de données
+- Classement des utilisateurs
 
-   ```bash
-    npx expo start
-   ```
+### Recherche
+- Filtrage des radars par département
+- Recherche par emplacement
+- Interface modale pour les résultats
 
-In the output, you'll find options to open the app in a
+## 🛠 Stack Technique
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Frontend
+- React Native avec Expo
+- Expo Router pour la navigation
+- React Native Maps pour la cartographie
+- Geolib pour les calculs de distance
+- AsyncStorage pour le stockage local
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Backend
+- API REST avec authentification
+- PostgreSQL avec Row Level Security (RLS)
+- Système de permissions granulaire
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+## 📱 Structure du Projet
+```
+app/
+├── (auth)/(tabs)/     # Routes authentifiées
+│   ├── explore/       # Carte et recherche
+│   └── index.tsx      # Page d'accueil
+├── ctx.tsx            # Contexte d'authentification
+├── login.tsx          # Page de connexion
+└── signup.tsx         # Page d'inscription
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 🔒 Sécurité
+- Protection des routes avec RLS
+- Tokens JWT pour l'authentification
+- Validation des données côté serveur
+- Gestion sécurisée des permissions
 
-## Learn more
+## 🌐 API Endpoints
+- `/api/auth/local` : Login
+- `/api/auth/register` : Inscription
+- `/api/ranks` : CRUD des scores
+- `/api/users/me` : Infos utilisateur
 
-To learn more about developing your project with Expo, look at the following resources:
+## 🚀 Installation
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. Cloner le repo
+2. Installer les dépendances : `npm install`
+3. Configurer le `.env` avec l'URL du backend
+4. Lancer l'app : `npx expo start`
 
-## Join the community
+## 📝 Variables d'Environnement
+```
+EXPO_PUBLIC_BACKEND_URL=http://your-backend-url:1337
+```
 
-Join our community of developers creating universal apps.
+## 🤝 Contribution
+Les contributions sont les bienvenues ! Voir le fichier CONTRIBUTING.md pour plus de détails.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 📄 Licence
+MIT
