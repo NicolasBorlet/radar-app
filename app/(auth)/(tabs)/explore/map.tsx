@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import MapView, { Region } from 'react-native-maps';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Crypto from 'expo-crypto';
-import * as Location from 'expo-location';
 import ZoneSvg from '@/components/zone';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+import { getDistance } from 'geolib';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import MapView, { Region } from 'react-native-maps';
 
 interface RadarData {
   latitude: number;
@@ -53,7 +53,10 @@ export default function TabTwoScreen() {
   const debounceTimer = useRef<NodeJS.Timeout>();
   const [currentDelta, setCurrentDelta] = useState<number>(0.0922);
   const [mapRegion, setMapRegion] = useState<Region>(initialRegion);
+  const [isInZone, setIsInZone] = useState(false);
+  const [time, setTime] = useState(0);
   const mapRef = useRef<MapView>(null);
+  const [activeZone, setActiveZone] = useState<RadarData | null>(null);
 
   const radarsComponents = useMemo(() => {
     return radarData.map((radar, i) => (
@@ -80,21 +83,21 @@ export default function TabTwoScreen() {
     // if (debounceTimer.current) {
     //   clearTimeout(debounceTimer.current);
     // }
-    
-    // debounceTimer.current = setTimeout(() => {
-    //   setCurrentDelta(region.latitudeDelta);
-    // }, 1000)
+
+    debounceTimer.current = setTimeout(() => {
+      setCurrentDelta(region.latitudeDelta);
+    }, 1000)
 
     console.log('Region changed:', region);
-    
-    setMapRegion(region);
-    setCurrentDelta(Math.min(region.latitudeDelta, region.longitudeDelta));
+
+    // setMapRegion(region);
+    // setCurrentDelta(Math.min(region.latitudeDelta, region.longitudeDelta));
   }, []);
 
   const fetchRadarData = useCallback(async () => {
     try {
       setIsLoading(true);
-  
+
       // Check for cached data
       const cachedData = await AsyncStorage.getItem('radarData');
       if (cachedData) {
@@ -104,25 +107,25 @@ export default function TabTwoScreen() {
         setIsLoading(false);
         return;
       }
-  
+
       // Fetch data from API
       let allData: RadarData[] = [];
       let page = 1;
       const pageSize = 50;
       let totalItems = 0;
-  
+
       do {
         const url = new URL('https://tabular-api.data.gouv.fr/api/resources/8a22b5a8-4b65-41be-891a-7c0aead4ba51/data/');
         url.searchParams.append('page_size', pageSize.toString());
         url.searchParams.append('page', page.toString());
-  
+
         const response = await fetch(url.toString());
         const jsonData: APIResponse = await response.json();
         totalItems = jsonData.meta.total;
         allData = allData.concat(jsonData.data);
         page++;
       } while (allData.length < totalItems);
-  
+
       console.log('Fetched all data');
       await AsyncStorage.setItem('radarData', JSON.stringify(allData));
       setRadarData(allData);
@@ -133,25 +136,97 @@ export default function TabTwoScreen() {
     }
   }, []);
 
+  // Detect when user enters a zone
+  const handleZoneEnter = useCallback((zone: RadarData) => {
+    setTime(Date.now());
+    console.log('Entered zone:', zone);
+  }, []);
+
+  // Detect when user leaves a zone
+  const handleZoneLeave = useCallback(() => {
+    // Stop timer
+    const timeInZone = Date.now() - time;
+    console.log('Time in zone:', timeInZone);
+  }, []);
+
+  useEffect(() => {
+    if (isInZone && activeZone) {
+      handleZoneEnter(activeZone);
+    } else {
+      handleZoneLeave();
+    }
+  }, [isInZone, activeZone]);
+
+  // Add this function to check if user is in any radar zone
+  const checkIfInZone = useCallback((userLocation: Location.LocationObject) => {
+    const ZONE_RADIUS = 100;
+
+    const zoneIndex = radarData.findIndex(radar => {
+      const distance = getDistance(
+        { latitude: userLocation.coords.latitude, longitude: userLocation.coords.longitude },
+        { latitude: radar.latitude, longitude: radar.longitude }
+      );
+      return distance <= ZONE_RADIUS;
+    });
+
+    const isInAnyZone = zoneIndex !== -1;
+    setIsInZone(isInAnyZone);
+    setActiveZone(isInAnyZone ? radarData[zoneIndex] : null);
+  }, [radarData]);
+
+  // Update location watching
+  useEffect(() => {
+    const watchLocation = async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+        return;
+      }
+
+      const subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 1000,
+          distanceInterval: 10,
+        },
+        (newLocation) => {
+          setLocation(newLocation);
+          checkIfInZone(newLocation);
+          setMapRegion(prev => ({
+            ...prev,
+            latitude: newLocation.coords.latitude,
+            longitude: newLocation.coords.longitude,
+          }));
+        }
+      );
+
+      return () => {
+        subscription.remove();
+      };
+    };
+
+    watchLocation();
+  }, [checkIfInZone]);
+
   // Initial data fetch and location setup
   useEffect(() => {
-    // const setup = async () => {
-    //   let { status } = await Location.requestForegroundPermissionsAsync();
-    //   if (status !== 'granted') {
-    //     setErrorMsg('Permission to access location was denied');
-    //     return;
-    //   }
+    const setup = async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+        return;
+      }
 
-    //   let userLocation = await Location.getCurrentPositionAsync({});
-    //   setLocation(userLocation);
-    //   setMapRegion(prev => ({
-    //     ...prev,
-    //     latitude: userLocation.coords.latitude,
-    //     longitude: userLocation.coords.longitude,
-    //   }));
-    // };
+      let userLocation = await Location.getCurrentPositionAsync({});
+      setLocation(userLocation);
+      setMapRegion(prev => ({
+        ...prev,
+        latitude: userLocation.coords.latitude,
+        longitude: userLocation.coords.longitude,
+      }));
+    };
 
-    // setup();
+    setup();
     fetchRadarData();
   }, []);
 
@@ -169,7 +244,7 @@ export default function TabTwoScreen() {
       ref={mapRef}
       region={mapRegion}
       initialRegion={initialRegion}
-      onRegionChangeComplete={handleRegionChange}
+      // onRegionChangeComplete={handleRegionChange}
       rotateEnabled={false}
       showsUserLocation
       showsMyLocationButton
